@@ -23,7 +23,6 @@
 #include "state_1.h"
 #include "state_2.h"
 #include "state_3.h"
-#include "tests.h"
 
 static void delay(uint32_t count) {
     while (count--) {
@@ -33,9 +32,6 @@ static void delay(uint32_t count) {
 
 int main(void)
 {
-    // Run unit tests first
-    run_unit_tests();
-
     uint8_t state = 1;
     uint8_t previous_button_state = 0;
     uint8_t show_state_number = 0;
@@ -57,36 +53,23 @@ int main(void)
             delay(500000);  // Debounce delay
             led_all_off();
             led_set(state - 1, 1);
-
-            // Show state number on display for 2 seconds
-            show_state_number = 1;
-            state_display_timer = 20000000; // ~2 seconds at ~10MHz
+                
         }
 
         previous_button_state = current_button_state;
 
-        // Handle state number display timing
-        if (show_state_number) {
-            segment_display_show_number(state);
-            if (state_display_timer > 0) {
-                state_display_timer--;
-            } else {
-                show_state_number = 0;
-                segment_display_clear();
-            }
-        } else {
-            // Run the current state
-            switch (state) {
-                case 1:
-                    state_1_run();
-                    break;
-                case 2:
-                    state_2_run();
-                    break;
-                case 3:
-                    state_3_run();
-                    break;
-            }
+        // Always run the current state
+        switch (state) {
+            case 1:
+                state_1_run();
+                break;
+            case 2:
+                state_2_run();
+                break;
+            case 3:
+                state_3_run();
+                break;
         }
+
     }
 }

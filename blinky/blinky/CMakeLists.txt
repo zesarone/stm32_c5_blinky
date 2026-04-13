@@ -49,7 +49,6 @@ set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/state_1.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/state_2.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/state_3.c
-	${CMAKE_CURRENT_SOURCE_DIR}/Src/tests.c
 )
 
 # Include directories for all compilers

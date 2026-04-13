@@ -80,7 +80,7 @@ void segment_display_show_float(float value);
  * Display a single digit at a specific position.
  *
  * @param digit    Digit to display (0-9).
- * @param position Position (0=rightmost, 3=leftmost).
+ * @param position Position (0=leftmost, 3=rightmost).
  * @param dp       Nonzero to show decimal point.
  */
 void segment_display_show_digit(uint8_t digit, uint8_t position, uint8_t dp);
