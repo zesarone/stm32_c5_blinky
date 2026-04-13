@@ -1,0 +1,10 @@
+{
+  "board": "NUCLEO-C5A3ZG",
+  "device": "STM32C5A3ZGT6",
+  "core": "Cortex-M33",
+  "order": 0,
+  "toolchain": "GCC",
+  "source": {
+    "sourceType": "Empty"
+  }
+}
