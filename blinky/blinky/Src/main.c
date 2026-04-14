@@ -24,50 +24,78 @@
 #include "state_2.h"
 #include "state_3.h"
 
-static void delay(uint32_t count) {
+typedef enum {
+    APP_STATE_1 = 1u,
+    APP_STATE_2 = 2u,
+    APP_STATE_3 = 3u
+} AppState;
+
+static void delay_cycles(uint32_t count) {
     while (count--) {
         __asm("nop");
     }
 }
 
+static uint8_t user_button_is_pressed(void)
+{
+    return (GPIOC->IDR & PIN_MASK(USER_BUTTON_PIN)) != 0u;
+}
+
+static void update_state_led(AppState state)
+{
+    led_all_off();
+    led_set((uint8_t)state - 1u, 1u);
+}
+
+static AppState advance_state(AppState state)
+{
+    if (state == APP_STATE_3) {
+        return APP_STATE_1;
+    }
+
+    return (AppState)((uint8_t)state + 1u);
+}
+
+static void run_active_state(AppState state)
+{
+    switch (state) {
+        case APP_STATE_1:
+            state_1_run();
+            break;
+
+        case APP_STATE_2:
+            state_2_run();
+            break;
+
+        case APP_STATE_3:
+            state_3_run();
+            break;
+
+        default:
+            segment_display_clear();
+            break;
+    }
+}
+
 int main(void)
 {
-    uint8_t state = 1;
-    uint8_t previous_button_state = 0;
+    AppState state = APP_STATE_1;
+    uint8_t previous_button_state = 0u;
 
     system_init();
-    led_all_off();
-    led_set(state - 1, 1);
+    update_state_led(state);
     segment_display_clear();
 
     while (1) {
-        uint8_t current_button_state = (GPIOC->IDR & PIN_MASK(USER_BUTTON_PIN)) != 0;
+        uint8_t current_button_state = user_button_is_pressed();
 
-        if (current_button_state && !previous_button_state) {
-            state++;
-            if (state > LED_COUNT) {
-                state = 1;
-            }
-            delay(500000);  // Debounce delay
-            led_all_off();
-            led_set(state - 1, 1);
-                
+        if ((current_button_state != 0u) && (previous_button_state == 0u)) {
+            state = advance_state(state);
+            update_state_led(state);
+            delay_cycles(500000u);
         }
 
         previous_button_state = current_button_state;
-
-        // Always run the current state
-        switch (state) {
-            case 1:
-                state_1_run();
-                break;
-            case 2:
-                state_2_run();
-                break;
-            case 3:
-                state_3_run();
-                break;
-        }
-
+        run_active_state(state);
     }
 }

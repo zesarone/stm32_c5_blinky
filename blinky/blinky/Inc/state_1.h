@@ -4,9 +4,8 @@
 /**
  * State 1: Prime Sieve
  *
- * Implements a prime number sieve algorithm. Shows the latest calculated
- * prime number on the 7-segment display. When reaching a prime larger than
- * 9999, starts over from the beginning.
+ * Generates prime numbers with a sieve and displays them in sequence.
+ * After the supported range is exhausted, the sequence restarts from 2.
  */
 void state_1_run(void);
 
