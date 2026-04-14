@@ -3,83 +3,157 @@
 Target board manual:
 https://www.st.com/resource/en/user_manual/um3616-stm32c5-nucleo144-board-mb2310-stmicroelectronics.pdf
 
-This document restates the original requirements in clearer language and flags the parts that are still ambiguous.
+This document describes the behavior implemented in the current codebase. It is a refined, implementation-aligned specification rather than the earlier draft requirement list.
+
+## Board manual cross-reference
+
+- The board-specific statements in this document have been cross-checked against UM3616 for the NUCLEO-C5A3ZG.
+- The verified board-level items are:
+	- USER button `B1` on `PC13`
+	- user LEDs `LD1`, `LD2`, and `LD3`
+	- button active level and debounce expectations
+	- default LED routing on the stock board configuration
+- The external 4-digit seven-segment display is project-specific hardware and is not part of the NUCLEO-C5A3ZG board manual.
+- The internal temperature-sensor conversion constants come from MCU documentation, not from the Nucleo board manual.
+
+## Project structure
+
+- Board and peripheral initialization is implemented in `init.c`.
+- LED control is implemented in `led.c`.
+- Seven-segment display rendering is implemented in `segment_display.c`.
+- Each application state is implemented in its own source file:
+	- `state_1.c`
+	- `state_2.c`
+	- `state_3.c`
+- The top-level state machine is implemented in `main.c`.
 
 ## Board initialization
 
-- All board-level initialization must be implemented in `init.c`.
-- This includes GPIO setup and any hardware initialization needed before the application state machine starts.
+- `system_init()` is responsible for bringing the board to a usable runtime state before the main loop starts.
+- The current implementation:
+	- enables HSI
+	- enables GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, and GPIOG clocks
+	- enables the ADC12 clock
+	- configures the USER button pin as input
+	- configures the seven-segment display GPIO pins as outputs
+	- initializes the LED and display modules
+- Manual-backed board detail:
+	- the USER button is `B1` on `PC13`
+	- button logic is active-high when pressed and low when released
+	- the board does not provide a hardware debounce filter for `B1`, so debounce must be handled in software
+	- `PC13` must remain configured as an input and must not be driven low as an output
 
-## LED state indicator
+## State machine behavior
 
-- The active state must be indicated with the on-board LEDs:
+- The firmware contains exactly three runtime states.
+- The active state advances on a USER button rising edge.
+- The transition order is `State 1 -> State 2 -> State 3 -> State 1`.
+- A simple software debounce delay is applied after a detected button press.
+- The active state LED is updated immediately after the state change.
+- The currently implemented firmware does not show a 2-second state-number splash screen during transitions.
+
+## LED state indication
+
 - State 1 uses LD1.
 - State 2 uses LD2.
 - State 3 uses LD3.
-- LED control must be implemented in `led.c`.
-- The LED module should expose hardware-agnostic functions for turning LEDs on and off.
-
-he button transition order is `State 1 -> State 2 -> State 3 -> State 1`
+- LED control is abstracted behind helper functions in `led.c`.
+- The main loop turns all LEDs off before enabling the LED for the newly selected state.
+- Manual-backed board detail:
+	- `LD1` is connected to `PA5` in the default board configuration and is active-high
+	- `LD2` is connected to `PG1`
+	- `LD3` is connected to `PG2`
+	- the current firmware assumes the default solder-bridge configuration for `LD1` (`SB8` path), not the alternate `PG0` routing
+	- the `led.c` polarity settings match the implemented board usage: `LD1` active-high, `LD2` active-low, `LD3` active-low
 
 ## Seven-segment display
 
-- A KYX5461AS 4-digit seven-segment display with decimal point is connected to the MCU.
-- The pin mapping is:
-- `segA` -> 'PF12' 
-- `segB` -> 'PB3'
-- `segC` -> 'PD6'
-- `segD` -> 'PD4'
-- `segE` -> 'PE14'
-- `segF` -> 'PB15'
-- `segG` -> 'PD5'
-- `decimal point` -> 'PD3'
-- `digit1` -> 'pf13' 
-- `digit2` -> 'PB14' 
-- `digit3` -> 'PB13'
-- `digit4` -> 'PA10'
+- A 4-digit KYX5461AS-style seven-segment display with decimal point is driven by multiplexing.
+- This display is external application hardware and is not described by the NUCLEO-C5A3ZG board manual.
+- The implemented GPIO mapping is:
+	- `segA` -> `PF12`
+	- `segB` -> `PB3`
+	- `segC` -> `PD6`
+	- `segD` -> `PD4`
+	- `segE` -> `PE14`
+	- `segF` -> `PB15`
+	- `segG` -> `PD5`
+	- `decimal point` -> `PD3`
+	- `digit1` -> `PF13`
+	- `digit2` -> `PB14`
+	- `digit3` -> `PB13`
+	- `digit4` -> `PA10`
 
-the segment mapping looks like this
-```
+Segment layout:
+
+```text
 Digit 1   Digit 2   Digit 3   Digit 4
-|--A--|   |--A--|   |--A--|   |--A--|   
-F     B   F     B   F     B   F     B   
-|--G--|   |--G--|   |--G--|   |--G--|   
-E     C   E     C   E     C   E     C   
-|--D--| * |--D--| * |--D--| * |--D--| *   
+|--A--|   |--A--|   |--A--|   |--A--|
+F     B   F     B   F     B   F     B
+|--G--|   |--G--|   |--G--|   |--G--|
+E     C   E     C   E     C   E     C
+|--D--| * |--D--| * |--D--| * |--D--| *
 ```
 
-- Display handling must be implemented in `segment_display.c`.
-- The display module must initialize the display hardware.
-- The display module must provide a simple function that accepts a floating-point value and renders it on the 4-digit display.
-- The display must support values such as `   0` and `111.1`.
-- do not show left-padded zeros, zero should be shown as only a sing '0' at the right most position. etc.
-truncate overflow and only allow unsigned values
+### Integer display behavior
 
-## State changes
+- `segment_display_show_number()` displays unsigned integer values in the range `0..9999`.
+- Leading zeros are suppressed.
+- Zero is rendered as a single `0` on the rightmost digit.
 
-- The USER button changes the active state.
-- After each state change, the display must show the new state number for 2 seconds.
-- After the 2-second indication, the display must be cleared before the selected state resumes normal display output.
+### Generic float display behavior
 
-## State implementation structure
+- `segment_display_show_float()` formats non-negative floating-point values to fit within four digits.
+- The formatter keeps as many decimal places as will fit:
+	- up to 3 decimals for values below `10`
+	- up to 2 decimals for values below `100`
+	- up to 1 decimal for values below `1000`
+- Trailing fractional zeros are trimmed when possible.
+- Values below `0` are clamped to `0`.
+- Values at or above `10000` are capped to `9999` for display.
 
-- Each application state must be implemented in its own `state_*.c` file.
+### Temperature display behavior
 
-## State 1: Prime calculation
+- State 2 uses the dedicated `segment_display_show_temperature()` path instead of the generic float formatter.
+- Temperature is displayed with one decimal place and a trailing `C` symbol on the fourth digit.
+- The display format is effectively `TT.TC`.
+- The temperature renderer supports values within `-99.9..99.9`, but the current seven-segment implementation does not render a minus sign.
+- Negative temperatures therefore do not display a visible sign.
 
-- Implement prime-number generation a strict sieve algorithm is required. 
-over all process to follow:
-1. start with first prime 2 and display it.
-2. sieve for the next prime, when it is found, display it.
-3. if new prime found > 9999 got to 1. else got to 2
+## State 1: Prime sieve display
 
+- State 1 uses a sieve-based prime generator over the range `0..9999`.
+- The sequence starts from prime `2`.
+- Each call to `state_1_run()` displays one prime value.
+- When the sieve reaches the end of the supported range, it is reinitialized and the sequence starts again from `2`.
+- Values above `9999` are not displayed.
 
-## State 2: Pi calculation
-Show the current temperature of the CPU in celsius.
-use 1 decimal precision and end with the unit c
+## State 2: Internal temperature display
+
+- State 2 reads the internal STM32 temperature sensor using ADC1 channel 18.
+- The ADC is configured in single-conversion mode with a long sample time.
+- The temperature sensor is enabled through the ADC common control register before conversion.
+- The implementation averages 32 ADC samples per update to reduce noise.
+- This behavior depends on the STM32C5 MCU peripheral, not on a board-level Nucleo feature described in UM3616.
+- Temperature conversion currently uses fixed STM32C5 datasheet constants:
+	- `V25 = 0.76 V`
+	- `Average slope = 2.5 mV/°C`
+	- `VREF = 3.3 V`
+- The computed temperature is clamped to the range `-40°C..85°C` before display.
+- The displayed output uses one decimal place and a trailing `C` indicator.
+- No VREFINT-based supply-voltage compensation is currently part of the implemented behavior.
 
 ## State 3: Counter
 
-- Display an increasing counter value.
-- The counter must increment until it reaches `9999`.
-- After `9999`, the counter must wrap back to `0`.
+- State 3 displays an increasing unsigned counter value.
+- The counter starts at `0`.
+- The counter increments on each call to `state_3_run()`.
+- After `9999`, the counter wraps back to `0`.
+- The effective visible count rate depends on the display refresh loop and CPU execution time; there is no separate timer-based rate control.
+
+## Implementation notes and non-goals
+
+- The current firmware is bare-metal and does not use HAL display or state-management helpers.
+- There is no UART output or logging requirement in the implemented code.
+- There is no dedicated state-entry animation or state-number presentation phase.
+- The requirements in this document intentionally reflect the code as it exists now, including current display limitations.
