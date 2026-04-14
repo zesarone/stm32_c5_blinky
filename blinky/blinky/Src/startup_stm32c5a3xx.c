@@ -291,8 +291,10 @@ __WEAK __NO_RETURN void Reset_Handler(void)
 {
   __set_PSP((uint32_t)(&__INITIAL_SP));
 
-  __set_MSPLIM((uint32_t)(&__STACK_LIMIT));
-  __set_PSPLIM((uint32_t)(&__STACK_LIMIT));
+  /* Note: MSPLIM and PSPLIM register writes may be protected on TrustZone-enabled devices
+     Commenting them out to avoid HardFault during startup */
+  // __set_MSPLIM((uint32_t)(&__STACK_LIMIT));
+  // __set_PSPLIM((uint32_t)(&__STACK_LIMIT));
 
   SystemInit();         /* CMSIS System Initialization */
   __PROGRAM_START();    /* Enter PreMain (C library entry point) */

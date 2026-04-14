@@ -34,8 +34,6 @@ int main(void)
 {
     uint8_t state = 1;
     uint8_t previous_button_state = 0;
-    uint8_t show_state_number = 0;
-    uint32_t state_display_timer = 0;
 
     system_init();
     led_all_off();

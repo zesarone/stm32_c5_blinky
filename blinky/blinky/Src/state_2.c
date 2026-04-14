@@ -1,86 +1,94 @@
 #include <stdint.h>
 #include "segment_display.h"
+#include "stm32c5xx.h"
 
-#define MAX_ITERATIONS 1000000
-#define SCROLL_WINDOW_SIZE 4
-#define SCROLL_MAX_POSITION 12
+// STM32C5 temperature sensor implementation following datasheet specifications
+// VSENSE at 25°C = 0.76V, Average slope = 2.5 mV/°C, VREF = 3.3V
 
-static double pi_value = 0.0;
-static uint32_t iterations = 0;
-static uint8_t precision_level = 0;
-static uint8_t scroll_mode = 0;
-static uint8_t scroll_position = 0;
+// STM32C5 temperature sensor implementation following datasheet specifications
+// VSENSE at 25°C = 0.76V, Average slope = 2.5 mV/°C
+// Note: VREFINT correction removed as it may be causing incorrect readings
 
-static double calculate_pi_leibniz(uint32_t max_iter) {
-    double pi = 0.0;
-    int sign = 1;
+#define V25_VOLTAGE     0.76f
+#define SLOPE_MV_PER_C  2.5f
+#define VREF_VOLTAGE    3.3f
+#define ADC_RESOLUTION  4095.0f
 
-    for (uint32_t i = 0; i < max_iter; i++) {
-        pi += sign * 4.0 / (2 * i + 1);
-        sign = -sign;
+static float read_temperature(void) {
+    // Enable ADC voltage regulator
+    ADC1->CR &= ~ADC_CR_DEEPPWD;
+    ADC1->CR |= ADC_CR_ADVREGEN;
+    
+    // Wait for regulator startup
+    for (volatile uint32_t i = 0; i < 10000; ++i) {
+        __asm("nop");
     }
-
-    return pi;
-}
-
-static float pi_display_value(double pi, uint8_t precision) {
-    uint32_t scale = 1u;
-    for (uint8_t i = 0; i < precision; ++i) {
-        scale *= 10u;
+    
+    // Configure ADC for temperature sensor
+    ADC1->CFGR1 = 0;
+    ADC1->CFGR2 = 0;
+    ADC1->SMPR1 = (7 << 24); // Sampling time for channel 18
+    ADC1->SQR1 = (18 << ADC_SQR1_SQ1_Pos); // Temperature sensor on channel 18
+    
+    // Enable temperature sensor via common register
+    ADC12_COMMON->CCR |= ADCC_CCR_TSEN;
+    
+    // Wait for sensor to stabilize
+    for (volatile uint32_t i = 0; i < 10000; ++i) {
+        __asm("nop");
     }
-
-    uint32_t rounded = (uint32_t)(pi * (double)scale + 0.5);
-    return (float)rounded / (float)scale;
-}
-
-static float pi_scroll_value(uint8_t position) {
-    static const char pi_digits[] = "3141592653589793238462643383279502884197169399375105820974944592";
-    uint32_t value = 0u;
-
-    for (uint8_t i = 0u; i < SCROLL_WINDOW_SIZE; ++i) {
-        uint8_t digit = (uint8_t)(pi_digits[position + i] - '0');
-        value = value * 10u + digit;
+    
+    // Enable ADC and wait for ready
+    ADC1->CR |= ADC_CR_ADEN;
+    for (uint32_t timeout = 100000; timeout > 0; timeout--) {
+        if (ADC1->ISR & ADC_ISR_ADRDY) break;
     }
-
-    return (float)value / 1000.0f;
+    
+    // Take multiple readings and average them to reduce noise
+    uint32_t adc_sum = 0;
+    const uint8_t num_samples = 32;
+    
+    for (uint8_t sample = 0; sample < num_samples; sample++) {
+        // Start conversion
+        ADC1->CR |= ADC_CR_ADSTART;
+        
+        // Wait for conversion complete
+        for (uint32_t timeout = 100000; timeout > 0; timeout--) {
+            if (ADC1->ISR & ADC_ISR_EOC) break;
+        }
+        
+        // Read result and accumulate
+        adc_sum += ADC1->DR;
+    }
+    
+    // Calculate average
+    uint32_t adc_value = adc_sum / num_samples;
+    
+    // Disable ADC
+    ADC1->CR |= ADC_CR_ADDIS;
+    for (uint32_t timeout = 100000; timeout > 0; timeout--) {
+        if ((ADC1->CR & ADC_CR_ADEN) == 0) break;
+    }
+    
+    // Disable temperature sensor
+    ADC12_COMMON->CCR &= ~ADCC_CCR_TSEN;
+    
+    // Temperature calculation using STM32C5 datasheet values
+    // VSENSE = (adc_value / ADC_RESOLUTION) * VREF_VOLTAGE
+    // Temperature = 25 + (V25_VOLTAGE - VSENSE) / (SLOPE_MV_PER_C / 1000)
+    
+    float vsense = ((float)adc_value / ADC_RESOLUTION) * VREF_VOLTAGE;
+    float slope_v_per_c = SLOPE_MV_PER_C / 1000.0f;  // Convert mV/°C to V/°C
+    float temperature = 25.0f + (V25_VOLTAGE - vsense) / slope_v_per_c;
+    
+    // Clamp to reasonable range
+    if (temperature < -40.0f) temperature = -40.0f;
+    if (temperature > 85.0f) temperature = 85.0f;
+    
+    return temperature;
 }
 
 void state_2_run(void) {
-    iterations++;
-
-    pi_value = calculate_pi_leibniz(iterations);
-
-    if (!scroll_mode && pi_value >= 3.141) {
-        scroll_mode = 1;
-        scroll_position = 0;
-    }
-
-    if (scroll_mode) {
-        float display_value = pi_scroll_value(scroll_position);
-        segment_display_show_float(display_value);
-
-        static uint16_t scroll_counter = 0u;
-        scroll_counter++;
-        if (scroll_counter >= 1000u) {
-            scroll_counter = 0u;
-            scroll_position++;
-            if (scroll_position > SCROLL_MAX_POSITION) {
-                scroll_position = 0u;
-            }
-        }
-    } else {
-        if (iterations % 1000u == 0u && precision_level < 3u) {
-            precision_level++;
-        }
-
-        float display_value = pi_display_value(pi_value, precision_level);
-        segment_display_show_float(display_value);
-    }
-
-    if (iterations >= MAX_ITERATIONS) {
-        iterations = 0u;
-        precision_level = 0u;
-        scroll_mode = 0u;
-        scroll_position = 0u;
-    }
+    float temperature = read_temperature();
+    segment_display_show_temperature(temperature);
 }

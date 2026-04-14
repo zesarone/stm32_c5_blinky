@@ -85,4 +85,12 @@ void segment_display_show_float(float value);
  */
 void segment_display_show_digit(uint8_t digit, uint8_t position, uint8_t dp);
 
+/**
+ * Display temperature value with °C unit indicator.
+ * Shows temperature on digits 0-2, and degree symbol on digit 3.
+ *
+ * @param temperature Temperature in Celsius to display.
+ */
+void segment_display_show_temperature(float temperature);
+
 #endif // SEGMENT_DISPLAY_H

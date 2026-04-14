@@ -3,8 +3,23 @@
 #include "segment_display.h"
 
 void system_init(void) {
+    // Ensure HSI is enabled
+    RCC->CR1 |= RCC_CR1_HSISON;
+    while ((RCC->CR1 & RCC_CR1_HSISRDY) == 0) {
+        // Wait for HSI ready
+    }
+
     RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOGEN | RCC_AHB2ENR_GPIOCEN |
                     RCC_AHB2ENR_GPIOBEN | RCC_AHB2ENR_GPIODEN | RCC_AHB2ENR_GPIOEEN | RCC_AHB2ENR_GPIOFEN;
+
+    // Enable ADC clock
+    RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;
+    (void)RCC->AHB2ENR;  // Read back to ensure write completes
+
+    // Small delay to allow GPIO clocks to stabilize
+    for (volatile uint32_t i = 0; i < 100; i++) {
+        __asm("nop");
+    }
 
     GPIOC->MODER &= ~(3U << (USER_BUTTON_PIN * 2));
 

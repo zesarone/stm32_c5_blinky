@@ -250,3 +250,64 @@ void segment_display_show_float(float value) {
 void segment_display_show_digit(uint8_t digit, uint8_t position, uint8_t dp) {
     display_digit(position, digit, dp != 0);
 }
+
+void segment_display_show_temperature(float temperature) {
+    // Round to nearest 0.1°C
+    int16_t temp_int = (int16_t)(temperature * 10.0f);
+    
+    // Clamp to valid range (-99.9 to 99.9)
+    if (temp_int < -999) temp_int = -999;
+    if (temp_int > 999) temp_int = 999;
+    
+    // Format as [tens][ones].[tenths][C_symbol]
+    uint8_t digits[4];
+    
+    // Extract sign
+    uint8_t is_negative = 0;
+    if (temp_int < 0) {
+        is_negative = 1;
+        temp_int = -temp_int;
+    }
+    
+    // Extract decimal digit values
+    uint8_t tenths = temp_int % 10;
+    uint8_t ones = (temp_int / 10) % 10;
+    uint8_t tens = (temp_int / 100) % 10;
+    
+    // Build digit array
+    // If negative and tens=0, show minus on first digit
+    if (is_negative && tens == 0) {
+        digits[0] = DIGIT_BLANK;  // Will display as blank (no minus symbol available)
+    } else {
+        digits[0] = tens;
+    }
+    digits[1] = ones;
+    digits[2] = tenths;
+    // digits[3] = 'C' indicator (0x39 = segments for C: A, F, E, D)
+    
+    // Display with cycling
+    const uint32_t cycles = 125u;
+    const uint8_t C_SYMBOL = 0x39;  // 7-segment pattern for 'C'
+    
+    for (uint32_t cycle = 0u; cycle < cycles; ++cycle) {
+        for (uint8_t idx = 0u; idx < 3u; ++idx) {
+            bool show_dp = (idx == 1);  // Decimal point after ones digit
+            display_digit(idx, digits[idx], show_dp);
+            short_delay();
+        }
+        // Display 'C' symbol on digit 3
+        display_all_off();
+        // Manually set segments for 'C' on digit 3
+        uint32_t pattern = C_SYMBOL;
+        for (uint32_t bit = 0; bit < 7u; ++bit) {
+            const uint32_t pin_mask = segment_pins[bit];
+            if ((pattern >> bit) & 1u) {
+                ((GPIO_TypeDef *)segment_ports[bit])->BSRR = pin_mask;
+            }
+        }
+        digit_ports[3]->BSRR = digit_pins[3] << 16U;
+        short_delay();
+    }
+    
+    display_all_off();
+}
