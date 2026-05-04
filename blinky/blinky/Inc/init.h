@@ -31,7 +31,8 @@
  * Initialize board peripherals used by the application.
  *
  * This function enables GPIO clocks, configures the USER button and rotary
- * encoder input pins, and calls led_init() to prepare LED output pins.
+ * encoder input pins, configures the reserved RMII Ethernet pins, and calls
+ * led_init() to prepare LED output pins.
  */
 void system_init(void);
 

@@ -1,11 +1,15 @@
 #include <stdint.h>
 #include "init.h"
 #include "segment_display.h"
+#include "stm32_hal.h"
 #include "stm32c5a3xx.h"
+
+#define SYSTICK_TICKS_PER_MS 20u
 
 static volatile uint16_t counter = 0u;
 static volatile uint8_t previous_encoder_state = 3u;
 static volatile int8_t encoder_accumulator = 0;
+static volatile uint8_t hal_tick_divider = 0u;
 
 static const int8_t transition_table[16] = {
     0, -1,  1,  0,
@@ -60,6 +64,12 @@ void SysTick_Handler(void)
     uint8_t current_state = read_encoder_state();
     uint8_t transition_index;
     int8_t delta;
+
+    hal_tick_divider++;
+    if (hal_tick_divider >= SYSTICK_TICKS_PER_MS) {
+        HAL_IncTick();
+        hal_tick_divider = 0u;
+    }
 
     if (current_state == previous_encoder_state) {
         return;

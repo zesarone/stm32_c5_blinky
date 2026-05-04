@@ -40,20 +40,46 @@ set(cpu_PARAMS
     # -mcpu, -mfloat, -mfloat-abi, ...
 )
 
+set(STM32CUBE_PACK_ROOT "$ENV{HOME}/.local/share/stm32cube/packs/STMicroelectronics" CACHE PATH "STM32Cube pack root")
+set(STM32C5_HAL_PACK_DIR "${STM32CUBE_PACK_ROOT}/stm32c5xx_hal_drivers/2.0.0")
+set(STM32_LAN8742_PACK_DIR "${STM32CUBE_PACK_ROOT}/lan8742_part_drivers/2.0.0")
+
+if(NOT EXISTS "${STM32C5_HAL_PACK_DIR}/hal/stm32_hal.h")
+    message(FATAL_ERROR "STM32C5 HAL pack not found at ${STM32C5_HAL_PACK_DIR}")
+endif()
+
+if(NOT EXISTS "${STM32_LAN8742_PACK_DIR}/lan8742.h")
+    message(FATAL_ERROR "LAN8742 pack not found at ${STM32_LAN8742_PACK_DIR}")
+endif()
+
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/init.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/ethernet_diag.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/led.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/segment_display.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/state_1.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/state_2.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/state_3.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/state_4.c
+    ${STM32C5_HAL_PACK_DIR}/hal/stm32c5xx_hal.c
+    ${STM32C5_HAL_PACK_DIR}/hal/stm32c5xx_hal_cortex.c
+    ${STM32C5_HAL_PACK_DIR}/hal/stm32c5xx_hal_eth.c
+    ${STM32C5_HAL_PACK_DIR}/hal/stm32c5xx_hal_exti.c
+    ${STM32C5_HAL_PACK_DIR}/hal/stm32c5xx_hal_gpio.c
+    ${STM32C5_HAL_PACK_DIR}/hal/stm32c5xx_hal_rcc.c
+    ${STM32_LAN8742_PACK_DIR}/lan8742.c
+    ${STM32_LAN8742_PACK_DIR}/interfaces/eth/lan8742_io.c
 )
 
 # Include directories for all compilers
 set(include_DIRS
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${STM32C5_HAL_PACK_DIR}/hal
+    ${STM32C5_HAL_PACK_DIR}/ll
+    ${STM32_LAN8742_PACK_DIR}
+    ${STM32_LAN8742_PACK_DIR}/interfaces/eth
 )
 
 # Include directories for each compiler
@@ -111,6 +137,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:C>: ${symbols_c_SYMB}>
     $<$<COMPILE_LANGUAGE:CXX>: ${symbols_cxx_SYMB}>
     $<$<COMPILE_LANGUAGE:ASM>: ${symbols_asm_SYMB}>
+    USE_EXTERNAL_ENV
+    HSE_VALUE=48000000UL
 
     # Configuration specific
     $<$<CONFIG:Debug>:DEBUG>

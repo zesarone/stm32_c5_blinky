@@ -23,11 +23,13 @@
 #include "state_1.h"
 #include "state_2.h"
 #include "state_3.h"
+#include "state_4.h"
 
 typedef enum {
     APP_STATE_1 = 1u,
     APP_STATE_2 = 2u,
-    APP_STATE_3 = 3u
+    APP_STATE_3 = 3u,
+    APP_STATE_4 = 4u
 } AppState;
 
 static void delay_cycles(uint32_t count) {
@@ -44,12 +46,20 @@ static uint8_t user_button_is_pressed(void)
 static void update_state_led(AppState state)
 {
     led_all_off();
+
+    if (state == APP_STATE_4) {
+        for (uint8_t led_index = 0u; led_index < LED_COUNT; ++led_index) {
+            led_set(led_index, 1u);
+        }
+        return;
+    }
+
     led_set((uint8_t)state - 1u, 1u);
 }
 
 static AppState advance_state(AppState state)
 {
-    if (state == APP_STATE_3) {
+    if (state == APP_STATE_4) {
         return APP_STATE_1;
     }
 
@@ -69,6 +79,10 @@ static void run_active_state(AppState state)
 
         case APP_STATE_3:
             state_3_run();
+            break;
+
+        case APP_STATE_4:
+            state_4_run();
             break;
 
         default:

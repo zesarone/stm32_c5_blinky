@@ -26,10 +26,12 @@ Most sections remain aligned with the existing codebase, while the joystick-rela
 - Board and peripheral initialization is implemented in `init.c`.
 - LED control is implemented in `led.c`.
 - Seven-segment display rendering is implemented in `segment_display.c`.
+- Ethernet diagnostics and PHY bring-up are implemented in `ethernet_diag.c`.
 - Each application state is implemented in its own source file:
 	- `state_1.c`
 	- `state_2.c`
 	- `state_3.c`
+	- `state_4.c`
 - The top-level state machine is implemented in `main.c`.
 
 ## Top-level firmware behavior
@@ -42,16 +44,18 @@ Most sections remain aligned with the existing codebase, while the joystick-rela
 	- enable GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, and GPIOH clocks
 	- enable the ADC12 clock
 	- configure every signal listed in the Peripheral Configuration section
+	- configure the Ethernet RMII pins listed in the Peripheral Configuration section for alternate-function use
 	- initialize the LED and display modules
 - After `system_init()` and before entering the main loop, the firmware shall perform a one-time joystick calibration.
 - After initialization completes, the firmware shall enter State 1.
 - After initialization completes, the display shall be controlled entirely by the active state logic.
+- Ethernet MAC and PHY bring-up shall not be performed during startup; it shall be deferred until State 4 is entered.
 
 ### State machine
 
-- The firmware contains exactly three runtime states.
+- The firmware contains exactly four runtime states.
 - The active state shall advance on a debounced rising edge of the USER button.
-- The transition order is `State 1 -> State 2 -> State 3 -> State 1`.
+- The transition order is `State 1 -> State 2 -> State 3 -> State 4 -> State 1`.
 - A simple software debounce delay is applied after a detected USER button press.
 - The active state LED shall update immediately after the state change.
 - The firmware shall not show a 2-second state-number splash screen during transitions.
@@ -85,6 +89,15 @@ Most sections remain aligned with the existing codebase, while the joystick-rela
 | Rotary encoder | `SW` | `PA2` | digital input with pull-up | currently unused by the application |
 | Rotary encoder | `DT` | `PA3` | digital input with pull-up | quadrature phase input |
 | Rotary encoder | `CLK` | `PC3` | digital input with pull-up | quadrature phase input |
+| Ethernet RMII | `REF_CLK` | `PA1` | alternate-function input | 50 MHz reference clock from onboard LAN8742A PHY |
+| Ethernet RMII | `MDIO` | `PE12` | alternate-function bidirectional | management data line |
+| Ethernet RMII | `MDC` | `PC1` | alternate-function output | management clock line |
+| Ethernet RMII | `CRS_DV` | `PD1` | alternate-function input | receive carrier/data valid |
+| Ethernet RMII | `RXD0` | `PC4` | alternate-function input | receive data bit 0 |
+| Ethernet RMII | `RXD1` | `PC5` | alternate-function input | receive data bit 1 |
+| Ethernet RMII | `TX_EN` | `PG11` | alternate-function output | transmit enable |
+| Ethernet RMII | `TXD0` | `PG13` | alternate-function output | transmit data bit 0 |
+| Ethernet RMII | `TXD1` | `PG12` | alternate-function output | transmit data bit 1 |
 
 ### USER button
 
@@ -99,12 +112,22 @@ Most sections remain aligned with the existing codebase, while the joystick-rela
 - State 1 uses `LD1`.
 - State 2 uses `LD2`.
 - State 3 uses `LD3`.
-- Exactly one state LED shall be active at a time.
+- State 4 uses all three state LEDs at once.
 - The firmware shall turn all state LEDs off before enabling the LED for the newly selected state.
 - The board-level LED routing assumptions are:
 	- `LD1` is connected to `PA5` in the default board configuration and is active-high
 	- `LD2` is connected to `PG1` and is used as active-low in the firmware
 	- `LD3` is connected to `PG2` and is used as active-low in the firmware
+
+### Ethernet
+
+- The board Ethernet interface is the onboard LAN8742A PHY connected to the MCU over RMII.
+- This firmware revision uses Ethernet only for low-level PHY diagnostics in State 4.
+- This firmware revision shall not include a TCP/IP stack, DHCP client, DNS client, HTTP client, or TLS stack.
+- State 4 shall use MDIO management transactions to detect the PHY and query link status.
+- State 4 shall not require an Ethernet cable to enter or remain active.
+- The firmware shall not rely on a dedicated MCU-controlled PHY reset GPIO, because the LAN8742A reset pin is tied to board `NRST` in the default board configuration.
+- The firmware may issue a PHY software reset over MDIO.
 
 ### Seven-segment display
 
@@ -235,9 +258,27 @@ light up only the row and column for each position of the joystick
 - The counter value is retained until the firmware is reset.
 - The display continuously shows the current counter value with no automatic ticking.
 
+### State 4: Ethernet diagnostics
+
+- State 4 is an interim diagnostics state for validating low-level Ethernet hardware bring-up before any weather-fetching feature is added.
+- On first entry into State 4 after reset, the firmware shall initialize the Ethernet MAC in RMII mode and prepare MDIO access to the onboard PHY.
+- State 4 shall enable the `SBS` peripheral clock before selecting the Ethernet PHY interface in RMII mode.
+- State 4 shall scan MDIO addresses `0..31` and identify the onboard LAN8742A by its PHY identifier registers instead of relying on a hard-coded PHY address.
+- If the firmware cannot initialize ETH/MDIO or cannot identify a LAN8742A PHY, the display shall show a failure indication while State 4 remains active.
+- In the normal success/fail presentation, that failure indication shall be `0000`.
+- During current bring-up debugging, State 4 may instead show stage-specific `1xxx` fault codes so the failing ETH or PHY step can be distinguished on hardware.
+- During current bring-up debugging, `1007` means the firmware could not read back RMII mode from the ETH PHY interface selection register after enabling the `SBS` peripheral clock and requesting RMII mode.
+- If the firmware can identify the LAN8742A PHY and the link is down, the display shall show `8742`.
+- If the PHY reports link up at `10` Mbit/s, the display shall show `10`.
+- If the PHY reports link up at `100` Mbit/s, the display shall show `100`.
+- State 4 shall poll the PHY link state continuously while it is active so that plugging or unplugging the cable updates the display without a reset.
+- State 4 shall not transmit or receive Ethernet frames in this revision.
+- State 4 shall keep all decimal points off in the normal non-debug presentation.
+
 ## Implementation notes and non-goals
 
 - The firmware is bare-metal and does not use HAL display or state-management helpers.
+- The Ethernet diagnostic path may use the STM32 HAL ETH module and the LAN8742 part driver for RMII and MDIO access.
 - There is no UART output or logging requirement.
 - There is no dedicated state-entry animation or state-number presentation phase.
-- This document defines the target behavior for the next firmware revision, including the joystick-driven State 2 display, even where the current code still reflects the earlier temperature-display behavior.
+- This document defines the target behavior for the current interim firmware revision, including the joystick-driven State 2 display and the Ethernet validation State 4 that precedes any future weather-display feature.
