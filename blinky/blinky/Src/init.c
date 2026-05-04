@@ -4,6 +4,14 @@
 
 #define ENCODER_POLL_HZ 20000u
 
+static void configure_input(GPIO_TypeDef *port, uint32_t pin)
+{
+    uint32_t shift = pin * 2u;
+
+    port->MODER &= ~(3u << shift);
+    port->PUPDR &= ~(3u << shift);
+}
+
 static void configure_input_with_pullup(GPIO_TypeDef *port, uint32_t pin)
 {
     uint32_t shift = pin * 2u;
@@ -11,6 +19,14 @@ static void configure_input_with_pullup(GPIO_TypeDef *port, uint32_t pin)
     port->MODER &= ~(3u << shift);
     port->PUPDR &= ~(3u << shift);
     port->PUPDR |= (1u << shift);
+}
+
+static void configure_analog_input(GPIO_TypeDef *port, uint32_t pin)
+{
+    uint32_t shift = pin * 2u;
+
+    port->MODER |= (3u << shift);
+    port->PUPDR &= ~(3u << shift);
 }
 
 static void configure_encoder_systick(void)
@@ -26,8 +42,9 @@ void system_init(void) {
         // Wait for HSI ready
     }
 
-    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOGEN | RCC_AHB2ENR_GPIOCEN |
-                    RCC_AHB2ENR_GPIOBEN | RCC_AHB2ENR_GPIODEN | RCC_AHB2ENR_GPIOEEN | RCC_AHB2ENR_GPIOFEN;
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN | RCC_AHB2ENR_GPIOCEN |
+                    RCC_AHB2ENR_GPIODEN | RCC_AHB2ENR_GPIOEEN | RCC_AHB2ENR_GPIOFEN |
+                    RCC_AHB2ENR_GPIOGEN | RCC_AHB2ENR_GPIOHEN;
 
     // Enable ADC clock
     RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;
@@ -38,7 +55,11 @@ void system_init(void) {
         __asm("nop");
     }
 
-    GPIOC->MODER &= ~(3U << (USER_BUTTON_PIN * 2));
+    configure_input(GPIOC, USER_BUTTON_PIN);
+
+    configure_analog_input(GPIOA, JOYSTICK_VRX_PIN);
+    configure_analog_input(GPIOB, JOYSTICK_VRY_PIN);
+    configure_input_with_pullup(JOYSTICK_SW_PORT, JOYSTICK_SW_PIN);
 
     configure_input_with_pullup(GPIOA, ROTARY_ENCODER_SW_PIN);
     configure_input_with_pullup(GPIOA, ROTARY_ENCODER_DT_PIN);

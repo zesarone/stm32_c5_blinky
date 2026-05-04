@@ -119,16 +119,29 @@ static void convert_digits_to_patterns(const uint8_t digits[4], uint8_t patterns
     }
 }
 
-static void render_patterns_cycles(const uint8_t patterns[4], int8_t decimal_point_index, uint32_t refresh_cycles)
+static void render_patterns_mask_cycles(const uint8_t patterns[4], uint8_t decimal_point_mask, uint32_t refresh_cycles)
 {
     for (uint32_t cycle = 0u; cycle < refresh_cycles; ++cycle) {
         for (uint8_t index = 0u; index < DIGIT_COUNT; ++index) {
-            display_pattern(index, patterns[index], decimal_point_index == (int8_t)index);
+            uint8_t enable_dp = ((decimal_point_mask >> index) & 1u) != 0u;
+
+            display_pattern(index, patterns[index], enable_dp != 0u);
             short_delay();
         }
     }
 
     display_all_off();
+}
+
+static void render_patterns_cycles(const uint8_t patterns[4], int8_t decimal_point_index, uint32_t refresh_cycles)
+{
+    uint8_t decimal_point_mask = 0u;
+
+    if ((decimal_point_index >= 0) && (decimal_point_index < (int8_t)DIGIT_COUNT)) {
+        decimal_point_mask = (uint8_t)(1u << (uint8_t)decimal_point_index);
+    }
+
+    render_patterns_mask_cycles(patterns, decimal_point_mask, refresh_cycles);
 }
 
 static void render_patterns(const uint8_t patterns[4], int8_t decimal_point_index)
@@ -329,6 +342,11 @@ void segment_display_show_digit(uint8_t digit, uint8_t position, uint8_t dp)
 
     patterns[position] = digit_patterns[digit];
     render_patterns(patterns, (dp != 0u) ? (int8_t)position : -1);
+}
+
+void segment_display_show_raw_once(const uint8_t patterns[4], uint8_t decimal_point_mask)
+{
+    render_patterns_mask_cycles(patterns, decimal_point_mask, 1u);
 }
 
 void segment_display_show_temperature(float temperature)

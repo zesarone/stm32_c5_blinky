@@ -83,6 +83,7 @@ int main(void)
     uint8_t previous_button_state = 0u;
 
     system_init();
+    state_2_init();
     update_state_led(state);
     segment_display_clear();
 

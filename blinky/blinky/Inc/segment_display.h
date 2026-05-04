@@ -33,6 +33,15 @@
 
 #define DIGIT_COUNT 4
 
+// Raw segment bit values for custom per-digit rendering.
+#define SEG_BIT_A 0x01u
+#define SEG_BIT_B 0x02u
+#define SEG_BIT_C 0x04u
+#define SEG_BIT_D 0x08u
+#define SEG_BIT_E 0x10u
+#define SEG_BIT_F 0x20u
+#define SEG_BIT_G 0x40u
+
 // Segment patterns for digits 0-9
 #define SEG_0 0x3F  // 0b00111111
 #define SEG_1 0x06  // 0b00000110
@@ -106,6 +115,15 @@ void segment_display_show_float(float value);
  * @param dp       Nonzero to show decimal point.
  */
 void segment_display_show_digit(uint8_t digit, uint8_t position, uint8_t dp);
+
+/**
+ * Display raw segment patterns for a single multiplex refresh pass.
+ *
+ * @param patterns           One raw segment bitmask per digit using SEG_BIT_*.
+ * @param decimal_point_mask Bitmask of decimal points to enable, one bit per digit.
+ *                           Bit 0 targets digit 1 and bit 3 targets digit 4.
+ */
+void segment_display_show_raw_once(const uint8_t patterns[4], uint8_t decimal_point_mask);
 
 /**
  * Display temperature value with °C unit indicator.

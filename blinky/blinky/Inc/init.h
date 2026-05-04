@@ -2,12 +2,22 @@
 #define INIT_H
 
 #include <stdint.h>
+#include "stm32c5xx.h"
 
 /**
  * USER button pin on the board.
  * This pin is configured as an input by system_init().
  */
 #define USER_BUTTON_PIN 13  // PC13
+
+/**
+ * Joystick pins.
+ * VRX and VRY are analog inputs. SW is configured as a pulled digital input.
+ */
+#define JOYSTICK_VRX_PIN  4U   // PA4
+#define JOYSTICK_VRY_PIN  0U   // PB0
+#define JOYSTICK_SW_PORT  GPIOC
+#define JOYSTICK_SW_PIN   0U   // PC0
 
 /**
  * Rotary encoder pins.
