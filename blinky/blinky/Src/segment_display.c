@@ -119,9 +119,9 @@ static void convert_digits_to_patterns(const uint8_t digits[4], uint8_t patterns
     }
 }
 
-static void render_patterns(const uint8_t patterns[4], int8_t decimal_point_index)
+static void render_patterns_cycles(const uint8_t patterns[4], int8_t decimal_point_index, uint32_t refresh_cycles)
 {
-    for (uint32_t cycle = 0u; cycle < DISPLAY_REFRESH_CYCLES; ++cycle) {
+    for (uint32_t cycle = 0u; cycle < refresh_cycles; ++cycle) {
         for (uint8_t index = 0u; index < DIGIT_COUNT; ++index) {
             display_pattern(index, patterns[index], decimal_point_index == (int8_t)index);
             short_delay();
@@ -129,6 +129,11 @@ static void render_patterns(const uint8_t patterns[4], int8_t decimal_point_inde
     }
 
     display_all_off();
+}
+
+static void render_patterns(const uint8_t patterns[4], int8_t decimal_point_index)
+{
+    render_patterns_cycles(patterns, decimal_point_index, DISPLAY_REFRESH_CYCLES);
 }
 
 static void format_unsigned_digits(uint16_t number, uint8_t digits[4])
@@ -266,6 +271,35 @@ void segment_display_show_number(uint16_t number)
     format_unsigned_digits(number, digits);
     convert_digits_to_patterns(digits, patterns);
     render_patterns(patterns, -1);
+}
+
+void segment_display_show_number_once(uint16_t number)
+{
+    uint8_t digits[4];
+    uint8_t patterns[4];
+
+    format_unsigned_digits(number, digits);
+    convert_digits_to_patterns(digits, patterns);
+    render_patterns_cycles(patterns, -1, 1u);
+}
+
+void segment_display_scan_number_step(uint16_t number)
+{
+    static uint8_t current_digit = 0u;
+    uint8_t digits[4];
+    uint8_t patterns[4];
+
+    format_unsigned_digits(number, digits);
+    convert_digits_to_patterns(digits, patterns);
+
+    display_pattern(current_digit, patterns[current_digit], false);
+    short_delay();
+    display_all_off();
+
+    current_digit++;
+    if (current_digit >= DIGIT_COUNT) {
+        current_digit = 0u;
+    }
 }
 
 void segment_display_show_float(float value)

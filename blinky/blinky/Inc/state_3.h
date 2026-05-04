@@ -2,10 +2,10 @@
 #define STATE_3_H
 
 /**
- * State 3: Counter
+ * State 3: Rotary Encoder Counter
  *
- * Shows a ticking number on the 7-segment display, counting up from 0 to 9999,
- * then resetting back to 0 and continuing.
+ * Shows the current counter value on the 7-segment display and updates the
+ * value based on the external rotary encoder direction.
  */
 void state_3_run(void);
 

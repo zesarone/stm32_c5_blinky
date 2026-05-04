@@ -69,6 +69,26 @@ void segment_display_clear(void);
 void segment_display_show_number(uint16_t number);
 
 /**
+ * Display a number for a single multiplex refresh pass.
+ *
+ * @param number Number to display (0-9999).
+ *
+ * This is intended for states that need faster polling of external inputs
+ * between display refreshes, such as a rotary encoder.
+ */
+void segment_display_show_number_once(uint16_t number);
+
+/**
+ * Refresh a single multiplex step for a number display.
+ *
+ * @param number Number to display (0-9999).
+ *
+ * Each call updates one digit only. Call repeatedly from a fast loop when
+ * input polling needs to remain highly responsive.
+ */
+void segment_display_scan_number_step(uint16_t number);
+
+/**
  * Display a floating-point number on the 7-segment display.
  *
  * @param value Float value to display.

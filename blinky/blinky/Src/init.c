@@ -2,6 +2,23 @@
 #include "led.h"
 #include "segment_display.h"
 
+#define ENCODER_POLL_HZ 20000u
+
+static void configure_input_with_pullup(GPIO_TypeDef *port, uint32_t pin)
+{
+    uint32_t shift = pin * 2u;
+
+    port->MODER &= ~(3u << shift);
+    port->PUPDR &= ~(3u << shift);
+    port->PUPDR |= (1u << shift);
+}
+
+static void configure_encoder_systick(void)
+{
+    SystemCoreClockUpdate();
+    SysTick_Config(SystemCoreClock / ENCODER_POLL_HZ);
+}
+
 void system_init(void) {
     // Ensure HSI is enabled
     RCC->CR1 |= RCC_CR1_HSISON;
@@ -22,6 +39,11 @@ void system_init(void) {
     }
 
     GPIOC->MODER &= ~(3U << (USER_BUTTON_PIN * 2));
+
+    configure_input_with_pullup(GPIOA, ROTARY_ENCODER_SW_PIN);
+    configure_input_with_pullup(GPIOA, ROTARY_ENCODER_DT_PIN);
+    configure_input_with_pullup(GPIOC, ROTARY_ENCODER_CLK_PIN);
+    configure_encoder_systick();
 
     // Set display pins as outputs
     GPIOF->MODER &= ~((3U << (13 * 2)) | (3U << (12 * 2)));

@@ -14,6 +14,7 @@ This document describes the behavior implemented in the current codebase. It is 
 	- button active level and debounce expectations
 	- default LED routing on the stock board configuration
 - The external 4-digit seven-segment display is project-specific hardware and is not part of the NUCLEO-C5A3ZG board manual.
+- The external rotary encoder used by State 3 is project-specific hardware and is not part of the NUCLEO-C5A3ZG board manual.
 - The internal temperature-sensor conversion constants come from MCU documentation, not from the Nucleo board manual.
 
 ## Project structure
@@ -35,6 +36,7 @@ This document describes the behavior implemented in the current codebase. It is 
 	- enables GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, and GPIOG clocks
 	- enables the ADC12 clock
 	- configures the USER button pin as input
+	- configures the rotary encoder pins as inputs with pull-ups
 	- configures the seven-segment display GPIO pins as outputs
 	- initializes the LED and display modules
 - Manual-backed board detail:
@@ -145,11 +147,17 @@ E     C   E     C   E     C   E     C
 
 ## State 3: Counter
 
-- State 3 displays an increasing unsigned counter value.
+- State 3 displays an unsigned counter value.
+- An external rotary encoder is connected as follows:
+	- `SW` -> `PA2`
+	- `DT` -> `PA3`
+	- `CLK` -> `PC3`
 - The counter starts at `0`.
-- The counter increments on each call to `state_3_run()`.
-- After `9999`, the counter wraps back to `0`.
-- The effective visible count rate depends on the display refresh loop and CPU execution time; there is no separate timer-based rate control.
+- Rotating the encoder in one direction increments the counter by one step.
+- Rotating the encoder in the opposite direction decrements the counter by one step.
+- The counter wraps in the range `0..9999`.
+- The encoder push switch on `PA2` is currently not used by the application.
+- The display continuously shows the current counter value with no automatic ticking.
 
 ## Implementation notes and non-goals
 
